@@ -34,7 +34,7 @@
         "./src/*"
       ],
       "@/prisma/client": [
-        "./prisma/generated/client"
+        "./prisma/local/generated/client"
       ]
     }
   },

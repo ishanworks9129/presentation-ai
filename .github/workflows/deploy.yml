@@ -34,21 +34,27 @@ jobs:
         env:
           SKIP_ENV_VALIDATION: "1"
 
-      - name: Assemble standalone bundle
+      # NOTE: standalone output (`node .next/standalone/server.js`) is intentionally
+      # NOT used here -- it hits a Turbopack bug where async external imports (the
+      # `pg` driver, pulled in via @prisma/adapter-pg) get compiled to a hashed
+      # external reference that never resolves at runtime, crashing every request
+      # with a 500. A plain `next start` against the full build output does not
+      # hit this bug, so we ship the full build + node_modules instead.
+      - name: Package release
         run: |
-          cp -r public .next/standalone/public
-          cp -r .next/static .next/standalone/.next/static
-          cp -r prisma .next/standalone/prisma
+          mkdir -p /tmp/release
+          cp -r .next node_modules package.json prisma /tmp/release/
+          [ -d public ] && cp -r public /tmp/release/public || true
+          tar czf release.tar.gz -C /tmp/release .
 
-      - name: Deploy bundle to EC2
+      - name: Upload release tarball
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          source: ".next/standalone/*,.next/standalone/.*"
-          target: "/home/ubuntu/app/releases/${{ github.sha }}"
-          strip_components: 2
+          source: "release.tar.gz"
+          target: "/home/ubuntu"
 
       - name: Activate release and restart app
         uses: appleboy/ssh-action@v1.0.3
@@ -59,6 +65,9 @@ jobs:
           script: |
             set -euo pipefail
             RELEASE_DIR="/home/ubuntu/app/releases/${{ github.sha }}"
+            mkdir -p "$RELEASE_DIR"
+            tar xzf /home/ubuntu/release.tar.gz -C "$RELEASE_DIR"
+            rm /home/ubuntu/release.tar.gz
             ln -sfn /home/ubuntu/app/shared/.env "$RELEASE_DIR/.env"
             ln -sfn "$RELEASE_DIR" /home/ubuntu/app/current
 
@@ -66,11 +75,11 @@ jobs:
             set -a
             source /home/ubuntu/app/shared/.env
             set +a
-            pnpm dlx prisma db push --schema=./prisma/schema.prisma
+            node_modules/.bin/prisma db push --schema=./prisma/schema.prisma
 
             pm2 describe presentation-ai > /dev/null 2>&1 \
               && pm2 restart presentation-ai --update-env \
-              || pm2 start server.js --name presentation-ai --cwd /home/ubuntu/app/current
+              || pm2 start node_modules/.bin/next --name presentation-ai --cwd /home/ubuntu/app/current -- start
             pm2 save
 
             sleep 3
