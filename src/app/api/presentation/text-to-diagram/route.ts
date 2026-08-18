@@ -5,7 +5,7 @@ import { consumeStream, createUIMessageStreamResponse } from "ai";
 import { NextResponse } from "next/server";
 
 import { templates } from "@/constants/antv-templates";
-import { modelPicker } from "@/lib/modelPicker";
+import { defaultModelPicker } from "@/lib/modelPicker";
 import { logger } from "@/lib/observability/server/logger";
 import {
   buildInfographicLayoutInstruction,
@@ -15,8 +15,6 @@ import {
   type InfographicSlideLayout,
 } from "@/lib/presentation/infographic-layout";
 import { auth } from "@/server/auth";
-
-const INFOGRAPHIC_MODEL = "google/gemini-3-flash-preview";
 
 type TextToDiagramRequest = {
   prompt: string;
@@ -291,7 +289,7 @@ export async function POST(req: Request) {
         ["system", SYSTEM_PROMPT],
         ["user", USER_PROMPT],
       ]),
-      modelPicker(INFOGRAPHIC_MODEL),
+      defaultModelPicker(),
     ]);
 
     const stream = await diagramChain.stream({

@@ -7,11 +7,9 @@ import { consumeStream, createUIMessageStreamResponse } from "ai";
 import { NextResponse } from "next/server";
 
 import { templates } from "@/constants/antv-templates";
-import { modelPicker } from "@/lib/modelPicker";
+import { defaultModelPicker } from "@/lib/modelPicker";
 import { logger } from "@/lib/observability/server/logger";
 import { auth } from "@/server/auth";
-
-const INFOGRAPHIC_MODEL = "google/gemini-3-flash-preview";
 
 // Organize templates by category for the prompt
 function organizeTemplates(templateList: string[]): string {
@@ -232,7 +230,7 @@ export async function POST(req: Request) {
     const templateList = organizeTemplates(templates);
     const editDiagramChain = RunnableSequence.from([
       PromptTemplate.fromTemplate(SYSTEM_PROMPT),
-      modelPicker(INFOGRAPHIC_MODEL),
+      defaultModelPicker(),
     ]);
 
     const stream = await editDiagramChain.stream({

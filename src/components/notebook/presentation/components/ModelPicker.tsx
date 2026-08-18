@@ -16,7 +16,7 @@ import {
   useLocalModels,
 } from "@/hooks/presentation/useLocalModels";
 import { usePresentationState } from "@/states/presentation-state";
-import { Bot, Cpu, Loader2, Monitor } from "lucide-react";
+import { Bot, Cpu, Loader2, Monitor, Sparkles } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 const modelPickerLogger = createLogger("client:model-picker");
@@ -89,6 +89,30 @@ function getOpenAIModel(modelId: string) {
   );
 }
 
+const VERTEX_MODELS = [
+  {
+    id: "gemini-2.5-flash",
+    label: "Gemini 2.5 Flash",
+    description: "Fast, low-cost Gemini model via Vertex AI",
+  },
+  {
+    id: "gemini-2.5-pro",
+    label: "Gemini 2.5 Pro",
+    description: "Higher-quality Gemini model via Vertex AI",
+  },
+  {
+    id: "gemini-2.0-flash",
+    label: "Gemini 2.0 Flash",
+    description: "Previous-generation fast Gemini model via Vertex AI",
+  },
+] as const;
+
+function getVertexModel(modelId: string) {
+  return (
+    VERTEX_MODELS.find((model) => model.id === modelId) ?? VERTEX_MODELS[0]
+  );
+}
+
 export function ModelPicker({
   shouldShowLabel = true,
 }: {
@@ -109,7 +133,11 @@ export function ModelPicker({
           modelId: savedModel.modelId || "gpt-4o-mini",
         });
         setModelProvider(
-          savedModel.modelProvider as "openai" | "ollama" | "lmstudio",
+          savedModel.modelProvider as
+            | "openai"
+            | "vertex"
+            | "ollama"
+            | "lmstudio",
         );
         setModelId(savedModel.modelId);
       }
@@ -160,6 +188,10 @@ export function ModelPicker({
       return `lmstudio-${modelId}`;
     }
 
+    if (modelProvider === "vertex") {
+      return `vertex-${getVertexModel(modelId).id}`;
+    }
+
     return `openai-${getOpenAIModel(modelId).id}`;
   };
 
@@ -171,6 +203,14 @@ export function ModelPicker({
       return {
         label: currentModel.label,
         icon: Bot,
+      };
+    }
+
+    if (modelProvider === "vertex") {
+      const currentModel = getVertexModel(modelId);
+      return {
+        label: currentModel.label,
+        icon: Sparkles,
       };
     }
 
@@ -209,6 +249,19 @@ export function ModelPicker({
       setModelProvider("openai");
       setModelId(selectedModel.id);
       setSelectedModel("openai", selectedModel.id);
+      return;
+    }
+
+    if (value.startsWith("vertex-")) {
+      const selectedModelId = value.replace("vertex-", "");
+      const selectedModel = getVertexModel(selectedModelId);
+      modelPickerLogger.info("Selected Vertex AI model", {
+        modelProvider: "vertex",
+        modelId: selectedModel.id,
+      });
+      setModelProvider("vertex");
+      setModelId(selectedModel.id);
+      setSelectedModel("vertex", selectedModel.id);
       return;
     }
 
@@ -299,6 +352,27 @@ export function ModelPicker({
               >
                 <div className="flex min-w-0 max-w-full items-center gap-3">
                   <Bot className="h-4 w-4 flex-shrink-0" />
+                  <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                    <span className="truncate text-sm">{model.label}</span>
+                    <span className="line-clamp-2 whitespace-normal break-words text-xs leading-snug text-muted-foreground">
+                      {model.description}
+                    </span>
+                  </div>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectGroup>
+
+          <SelectGroup>
+            <SelectLabel>Gemini (Vertex AI)</SelectLabel>
+            {VERTEX_MODELS.map((model) => (
+              <SelectItem
+                key={model.id}
+                value={`vertex-${model.id}`}
+                className="overflow-hidden"
+              >
+                <div className="flex min-w-0 max-w-full items-center gap-3">
+                  <Sparkles className="h-4 w-4 flex-shrink-0" />
                   <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                     <span className="truncate text-sm">{model.label}</span>
                     <span className="line-clamp-2 whitespace-normal break-words text-xs leading-snug text-muted-foreground">

@@ -27,7 +27,7 @@ interface OutlineMessageMetadata {
   numberOfCards?: number;
   language?: string;
   modelId?: string;
-  modelProvider?: "openai" | "ollama" | "lmstudio";
+  modelProvider?: "openai" | "vertex" | "ollama" | "lmstudio";
   webSearch?: boolean;
   autoTheme?: boolean;
   textContent?: "minimal" | "concise" | "detailed" | "extensive";

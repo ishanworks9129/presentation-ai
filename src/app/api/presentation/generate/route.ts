@@ -18,7 +18,7 @@ import { auth } from "@/server/auth";
 
 type SlidesRequest = Omit<PresentationGenerationPromptInput, "currentDate"> & {
   modelId?: string;
-  modelProvider?: "openai" | "ollama" | "lmstudio";
+  modelProvider?: "openai" | "vertex" | "ollama" | "lmstudio";
   presentationId?: string;
 };
 

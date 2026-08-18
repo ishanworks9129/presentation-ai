@@ -1,9 +1,12 @@
 import { env } from "@/env";
 import { createLogger } from "@/lib/observability/logger";
+import { ChatVertexAI } from "@langchain/google-vertexai";
 import { ChatOpenAI } from "@langchain/openai";
 
-type ModelProvider = "openai" | "ollama" | "lmstudio";
+type ModelProvider = "openai" | "vertex" | "ollama" | "lmstudio";
 const modelLogger = createLogger("model-picker");
+const DEFAULT_VERTEX_LOCATION = "us-central1";
+const DEFAULT_VERTEX_MODEL = "gemini-2.5-flash";
 const OLLAMA_BASE_URL = "http://localhost:11434";
 const OLLAMA_TAGS_URL = `${OLLAMA_BASE_URL}/api/tags`;
 const OLLAMA_PULL_URL = `${OLLAMA_BASE_URL}/api/pull`;
@@ -13,6 +16,21 @@ const LM_STUDIO_MODELS_URLS = [
   `${LM_STUDIO_API_BASE_URL}/models`,
   `${LM_STUDIO_BASE_URL}/api/v0/models`,
 ] as const;
+
+function getDefaultProviderSelection(): {
+  provider: ModelProvider;
+  modelId?: string;
+} {
+  if (env.OPENAI_API_KEY?.trim()) {
+    return { provider: "openai" };
+  }
+
+  if (env.GOOGLE_VERTEX_PROJECT_ID?.trim()) {
+    return { provider: "vertex" };
+  }
+
+  return { provider: "openai" };
+}
 
 interface OllamaTagsResponse {
   models?: Array<{ name?: string }>;
@@ -55,7 +73,30 @@ function extractLMStudioModelIds(payload: unknown): string[] {
 }
 
 function isModelProvider(value: string): value is ModelProvider {
-  return value === "openai" || value === "ollama" || value === "lmstudio";
+  return (
+    value === "openai" ||
+    value === "vertex" ||
+    value === "ollama" ||
+    value === "lmstudio"
+  );
+}
+
+function parseVertexCredentials(): Record<string, unknown> | undefined {
+  const rawCredentials = env.GOOGLE_VERTEX_CREDENTIALS_JSON?.trim();
+  if (!rawCredentials) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(rawCredentials) as Record<string, unknown>;
+  } catch (error) {
+    modelLogger.error("Failed to parse GOOGLE_VERTEX_CREDENTIALS_JSON", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new Error(
+      "GOOGLE_VERTEX_CREDENTIALS_JSON must contain a valid GCP service account JSON key.",
+    );
+  }
 }
 
 function resolveModelSelection(
@@ -300,12 +341,25 @@ export function assertModelIsConfigured(
     );
   }
 
+  if (selection.provider === "vertex" && !env.GOOGLE_VERTEX_PROJECT_ID?.trim()) {
+    modelLogger.error("Model configuration failed", undefined, {
+      provider: selection.provider,
+      modelId: selection.modelId || DEFAULT_VERTEX_MODEL,
+      reason: "missing_vertex_project_id",
+    });
+    throw new Error(
+      "GOOGLE_VERTEX_PROJECT_ID is required when using a Vertex AI (Gemini) model.",
+    );
+  }
+
   modelLogger.info("Model configuration validated", {
     provider: selection.provider,
     modelId:
       selection.provider === "openai"
         ? selectedOpenAIModel
-        : selectedLocalModel || undefined,
+        : selection.provider === "vertex"
+          ? selection.modelId || DEFAULT_VERTEX_MODEL
+          : selectedLocalModel || undefined,
   });
 }
 
@@ -375,6 +429,35 @@ export function modelPicker(modelProviderOrModel: string, modelId?: string) {
     });
   }
 
+  if (selection.provider === "vertex") {
+    const projectId = env.GOOGLE_VERTEX_PROJECT_ID?.trim();
+    if (!projectId) {
+      throw new Error(
+        "GOOGLE_VERTEX_PROJECT_ID is required when using a Vertex AI (Gemini) model.",
+      );
+    }
+
+    const selectedVertexModel = selection.modelId || DEFAULT_VERTEX_MODEL;
+    const location = env.GOOGLE_VERTEX_LOCATION?.trim() || DEFAULT_VERTEX_LOCATION;
+    const credentials = parseVertexCredentials();
+
+    modelLogger.info("Creating Vertex AI model client", {
+      provider: selection.provider,
+      modelId: selectedVertexModel,
+      location,
+      hasInlineCredentials: Boolean(credentials),
+    });
+
+    return new ChatVertexAI({
+      model: selectedVertexModel,
+      location,
+      authOptions: {
+        projectId,
+        ...(credentials ? { credentials } : {}),
+      },
+    });
+  }
+
   const selectedOpenAIModel = selection.modelId || "gpt-4o-mini";
   const openAIApiKey = env.OPENAI_API_KEY?.trim();
 
@@ -388,4 +471,19 @@ export function modelPicker(modelProviderOrModel: string, modelId?: string) {
     model: selectedOpenAIModel,
     ...(openAIApiKey ? { apiKey: openAIApiKey } : {}),
   });
+}
+
+/**
+ * For code paths that don't let the user pick a model (the presentation agent,
+ * single-slide generation, diagram generation): picks OpenAI if configured,
+ * otherwise falls back to Vertex AI so a Google-only deployment still works.
+ */
+export function assertDefaultModelIsConfigured() {
+  const selection = getDefaultProviderSelection();
+  assertModelIsConfigured(selection.provider, selection.modelId);
+}
+
+export function defaultModelPicker() {
+  const selection = getDefaultProviderSelection();
+  return modelPicker(selection.provider, selection.modelId);
 }

@@ -1,5 +1,8 @@
 import { createUIMessageStreamResponse } from "ai";
-import { assertModelIsConfigured, modelPicker } from "@/lib/modelPicker";
+import {
+  assertDefaultModelIsConfigured,
+  defaultModelPicker,
+} from "@/lib/modelPicker";
 import { createLogger } from "@/lib/observability/logger";
 import { toUIMessageStream } from "@ai-sdk/langchain";
 import { auth } from "@/server/auth";
@@ -173,7 +176,7 @@ Create a detailed, artistic prompt that:
 Now generate the single image slide.
 `;
 
-const model = modelPicker("gpt-4o-mini");
+const model = defaultModelPicker();
 
 function getImageStyleGuidance(style?: string): string {
   switch (style) {
@@ -238,19 +241,15 @@ export async function POST(req: Request) {
       imageStyle: imageStyle || "3D",
       textDensity: textDensity || "Balanced",
       promptLength: prompt.length,
-      modelProvider: "openai",
-      modelId: "gpt-4o-mini",
     });
     try {
-      assertModelIsConfigured("gpt-4o-mini");
+      assertDefaultModelIsConfigured();
     } catch (error) {
       routeLogger.error(
         "Single slide generation request rejected: invalid model configuration",
         error,
         {
           requestId,
-          modelProvider: "openai",
-          modelId: "gpt-4o-mini",
         },
       );
       return NextResponse.json(

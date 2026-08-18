@@ -1,0 +1,81 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@11.1.3 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          SKIP_ENV_VALIDATION: "1"
+
+      - name: Build
+        run: pnpm run build
+        env:
+          SKIP_ENV_VALIDATION: "1"
+
+      - name: Assemble standalone bundle
+        run: |
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
+          cp -r prisma .next/standalone/prisma
+
+      - name: Deploy bundle to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: ".next/standalone/*,.next/standalone/.*"
+          target: "/home/ubuntu/app/releases/${{ github.sha }}"
+          strip_components: 2
+
+      - name: Activate release and restart app
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            RELEASE_DIR="/home/ubuntu/app/releases/${{ github.sha }}"
+            ln -sfn /home/ubuntu/app/shared/.env "$RELEASE_DIR/.env"
+            ln -sfn "$RELEASE_DIR" /home/ubuntu/app/current
+
+            cd /home/ubuntu/app/current
+            set -a
+            source /home/ubuntu/app/shared/.env
+            set +a
+            pnpm dlx prisma db push --schema=./prisma/schema.prisma
+
+            pm2 describe presentation-ai > /dev/null 2>&1 \
+              && pm2 restart presentation-ai --update-env \
+              || pm2 start server.js --name presentation-ai --cwd /home/ubuntu/app/current
+            pm2 save
+
+            sleep 3
+            curl -f http://localhost:3000/ -o /dev/null -s
+
+            # keep the 5 most recent releases
+            cd /home/ubuntu/app/releases
+            ls -1t | tail -n +6 | xargs -r rm -rf

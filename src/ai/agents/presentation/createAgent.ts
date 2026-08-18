@@ -8,7 +8,7 @@ import {
 import { checkpointer } from "@/ai/lib/postgres";
 import { pastedContentMiddleware } from "@/ai/lib/processPastedContent";
 import { presentationTools } from "@/ai/tools/presentation/tools";
-import { modelPicker } from "@/lib/modelPicker";
+import { defaultModelPicker } from "@/lib/modelPicker";
 
 // Create the graph
 export function createPresentationGraph() {
@@ -35,7 +35,7 @@ export function createPresentationGraph() {
     trimMessageHistory,
   ];
 
-  const llm = modelPicker("gpt-4o-mini");
+  const llm = defaultModelPicker();
   const agent = createAgent({
     model: llm.withConfig({
       parallel_tool_calls: false,
