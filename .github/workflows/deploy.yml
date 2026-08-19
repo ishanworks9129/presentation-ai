@@ -28,11 +28,17 @@ jobs:
         run: pnpm install --frozen-lockfile
         env:
           SKIP_ENV_VALIDATION: "1"
+          # prisma.config.ts reads DATABASE_URL directly via Prisma's own env()
+          # helper during `prisma generate` (postinstall) -- this is separate from
+          # our app's SKIP_ENV_VALIDATION and throws if the var is unset at all.
+          # A dummy value is fine; nothing connects to it at build time.
+          DATABASE_URL: "postgresql://build:build@localhost:5432/build"
 
       - name: Build
         run: pnpm run build
         env:
           SKIP_ENV_VALIDATION: "1"
+          DATABASE_URL: "postgresql://build:build@localhost:5432/build"
 
       # NOTE: standalone output (`node .next/standalone/server.js`) is intentionally
       # NOT used here -- it hits a Turbopack bug where async external imports (the
