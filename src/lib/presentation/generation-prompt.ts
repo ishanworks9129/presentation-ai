@@ -47,6 +47,7 @@ const COMPONENT_INSTRUCTIONS = `Component instructions:
 - Do not pair CYCLE with layout="vertical".
 - Use compact text in dense visual components. SNAKE, CIRCULAR-GRID, CONNECTED-CIRCLES, and SLOPE items need very short labels.
 - SLOPE items must use <H4> only and must not include <P>.
+- Do not stack a summary component (ARROWS, STEPS, BOXES, TIMELINE) directly above a separate BULLETS or ICONS detail list on the same slide unless both have the exact same item count, in the same order, describing the same items -- never a different count between them (e.g. 2 ARROWS phases above 3 unrelated BULLETS is wrong).
 - Use <TITLE> only for the first slide, a newly created title slide, or an introduction slide.
 - Use <CONTRIBUTOR /> only as an empty standalone metadata block. Do not add attributes or body text to it.
 - Treat <LABEL>, <QUOTE>, <CALLOUT>, and <CODE> as normal content blocks that can be used anywhere headings and paragraphs can be used, including inside COLUMNS.
