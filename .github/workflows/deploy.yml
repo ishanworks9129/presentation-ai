@@ -49,7 +49,7 @@ jobs:
       - name: Package release
         run: |
           mkdir -p /tmp/release
-          cp -r .next node_modules package.json prisma /tmp/release/
+          cp -r .next node_modules package.json prisma prisma.config.ts /tmp/release/
           [ -d public ] && cp -r public /tmp/release/public || true
           tar czf release.tar.gz -C /tmp/release .
 
