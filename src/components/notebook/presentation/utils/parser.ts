@@ -2841,14 +2841,16 @@ export class SlideParser {
         const icon = this.extractIconValue(child);
 
         // Slope items can ONLY hold headings of very small levels (e.g. H4) and NO description.
-        // We extract text content and wrap it in a single h4 element, discarding any other tags.
+        // We extract text content and wrap it in a single h4 element, discarding any other tags
+        // (including P/description tags the model may add despite instructions -- the fixed-size
+        // pill shape has no room for body text, so it must never be concatenated into the heading).
         let textContent = "";
         for (const gc of child.children) {
           if (isTextNode(gc)) {
             textContent += gc.text;
           } else if (isElementNode(gc)) {
             const gcTag = gc.tag.toUpperCase();
-            if (["H1", "H2", "H3", "H4", "H5", "H6", "P"].includes(gcTag)) {
+            if (["H1", "H2", "H3", "H4", "H5", "H6"].includes(gcTag)) {
               textContent += this.getTextContent(gc);
             }
           }
