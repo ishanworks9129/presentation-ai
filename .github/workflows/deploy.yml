@@ -70,6 +70,16 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -euo pipefail
+
+            # Prune old releases BEFORE extracting the new one -- each release
+            # ships full node_modules (~2GB+), and doing this after a failed
+            # deploy (e.g. a later step erroring) meant a full disk kept the
+            # cleanup from ever running, compounding on every retry until the
+            # disk hit 100% and every subsequent deploy failed at extraction.
+            cd /home/ubuntu/app/releases
+            ls -1t | tail -n +3 | xargs -r rm -rf
+            cd /home/ubuntu/app
+
             RELEASE_DIR="/home/ubuntu/app/releases/${{ github.sha }}"
             mkdir -p "$RELEASE_DIR"
             tar xzf /home/ubuntu/release.tar.gz -C "$RELEASE_DIR"
@@ -91,6 +101,7 @@ jobs:
             sleep 3
             curl -f http://localhost:3000/ -o /dev/null -s
 
-            # keep the 5 most recent releases
+            # belt-and-suspenders: prune again in case this run's release
+            # pushed past the pre-deploy cleanup's headroom
             cd /home/ubuntu/app/releases
-            ls -1t | tail -n +6 | xargs -r rm -rf
+            ls -1t | tail -n +3 | xargs -r rm -rf
