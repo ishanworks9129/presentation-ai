@@ -17,6 +17,7 @@ import { findInfographicEntryById } from "@/hooks/presentation/infographic/findI
 import {
   buildInfographicLayoutInstruction,
   getInfographicOrientationForSlideLayout,
+  sanitizeInfographicSyntax,
 } from "@/lib/presentation/infographic-layout";
 import { useInfographicStreamingState } from "@/states/infographic-streaming-state";
 import { usePresentationState } from "@/states/presentation-state";
@@ -172,15 +173,17 @@ export function useAntvInfographicGeneration({
         return;
       }
 
+      const sanitizedCompletion = sanitizeInfographicSyntax(completion);
+
       if (isMountedRef.current) {
-        setSyntax(completion);
+        setSyntax(sanitizedCompletion);
         setHasError(false);
       }
 
       const didUpdateNode = updateInfographicNode(
         [activeRequest.elementId, elementId],
         {
-          syntax: completion,
+          syntax: sanitizedCompletion,
           isLoading: false,
         },
       );
@@ -189,7 +192,7 @@ export function useAntvInfographicGeneration({
         elementId: activeRequest.elementId,
         didUpdateNode,
         requestKey: activeRequest.requestKey,
-        syntaxLength: completion.length,
+        syntaxLength: sanitizedCompletion.length,
       });
 
       if (!didUpdateNode && isMountedRef.current) {

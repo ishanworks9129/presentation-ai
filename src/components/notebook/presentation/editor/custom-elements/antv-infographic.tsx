@@ -153,7 +153,7 @@ const AntvInfographicBase = memo(function AntvInfographic(
             data-infographic-resize-handle="true"
           />
 
-          <div className="relative min-h-75 w-full overflow-hidden rounded-lg">
+          <div className="relative min-h-[420px] w-full overflow-hidden rounded-lg">
             {hasError ? (
               <div className="flex h-50 w-full flex-col items-center justify-center rounded-lg bg-red-50 text-red-500 dark:bg-red-950">
                 <p className="font-medium">Failed to generate diagram</p>
@@ -170,13 +170,16 @@ const AntvInfographicBase = memo(function AntvInfographic(
               </div>
             ) : (
               <>
-                {/* Container is always mounted for stable instance */}
+                {/* Container is always mounted for stable instance.
+                    Sized taller than AntV's old 300px default -- that was
+                    tight enough for a title + subtitle + several badge
+                    nodes to collide/overlap the slide's own title. */}
                 <div
                   ref={containerRef}
                   data-infographic-canvas="true"
-                  className="min-h-75 w-full overflow-hidden"
+                  className="min-h-[420px] w-full overflow-hidden"
                   style={{
-                    minHeight: "300px",
+                    minHeight: "420px",
                     opacity: element.isLoading ? 0.35 : 1,
                   }}
                 />
